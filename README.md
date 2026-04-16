@@ -1,0 +1,2 @@
+# metanorma-core
+Core repository for plugin dependencies of Metanorma
