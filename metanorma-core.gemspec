@@ -25,9 +25,9 @@ Gem::Specification.new do |spec|
   end
   spec.required_ruby_version = Gem::Requirement.new(">= 3.1.0")
 
-  spec.add_runtime_dependency "asciidoctor"
-  spec.add_runtime_dependency "nokogiri"
-  spec.add_runtime_dependency "metanorma-taste", "~> 1.0.0"
+  spec.add_dependency "asciidoctor"
+  spec.add_dependency "metanorma-taste", "~> 1.0.0"
+  spec.add_dependency "nokogiri"
 
   spec.add_development_dependency "debug"
   spec.add_development_dependency "rake", "~> 13.0"
@@ -35,4 +35,5 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency "rubocop", "~> 1"
   spec.add_development_dependency "rubocop-performance"
   spec.add_development_dependency "simplecov", "~> 0.15"
+  #spec.metadata["rubygems_mfa_required"] = "true"
 end
