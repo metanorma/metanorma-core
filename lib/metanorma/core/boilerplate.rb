@@ -57,9 +57,7 @@ module Metanorma
           #{text}
         ADOC
         c = isolated_asciidoctor_convert(
-          doc,
-          { backend: flavour, header_footer: true },
-          localdir: localdir,
+          doc, backend: flavour, header_footer: true, localdir: localdir,
         )
         Nokogiri::XML(c).at("//xmlns:sections")
       end
@@ -67,11 +65,18 @@ module Metanorma
       # Run Asciidoctor.convert with curated options so that no attributes,
       # base_dir, or safe-mode setting leak in from an outer conversion
       # context. Forces novalid for the inner conversion.
-      def isolated_asciidoctor_convert(content, options = {}, localdir: nil)
+      #
+      # `localdir` may be passed inside the options hash; standoc callers that
+      # already have @localdir set on self get base_dir wired up from there.
+      # The :localdir key (if present) is stripped before delegating to
+      # Asciidoctor.convert.
+      def isolated_asciidoctor_convert(content, options = {})
         @isolated_conversion_stack ||= []
         @isolated_conversion_stack << true
         begin
-          preserved = extract_preserved_options(options, localdir: localdir)
+          preserved = extract_preserved_options(options)
+          options = options.dup
+          options.delete(:localdir)
           isolated = preserved.merge(options).merge(
             attributes: (preserved[:attributes] || {}).merge(
               "novalid" => "",
@@ -83,9 +88,11 @@ module Metanorma
         end
       end
 
-      def extract_preserved_options(user_opt, localdir: nil)
+      def extract_preserved_options(user_opt)
         options = {}
         options[:safe] = user_opt[:safe] if user_opt.key?(:safe)
+        localdir = user_opt[:localdir] ||
+          (defined?(@localdir) ? @localdir : nil)
         if localdir && !user_opt.key?(:base_dir)
           options[:base_dir] = localdir
         end

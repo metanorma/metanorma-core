@@ -143,16 +143,18 @@ RSpec.describe Metanorma::Core::Boilerplate do
   end
 
   describe ".isolated_asciidoctor_convert" do
-    it "passes localdir as :base_dir when caller did not supply :base_dir" do
+    it "passes :localdir from the options hash through as :base_dir when " \
+       "caller did not supply :base_dir" do
       seen = nil
       allow(::Asciidoctor).to receive(:convert) do |_content, opts|
         seen = opts
         ""
       end
       described_class.isolated_asciidoctor_convert(
-        "= X", { backend: :html5 }, localdir: "/tmp/xyz",
+        "= X", backend: :html5, localdir: "/tmp/xyz",
       )
       expect(seen[:base_dir]).to eq("/tmp/xyz")
+      expect(seen).not_to have_key(:localdir)
     end
 
     it "forces novalid attribute on the inner convert" do
