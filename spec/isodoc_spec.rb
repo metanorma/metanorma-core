@@ -131,4 +131,57 @@ RSpec.describe Metanorma::Core::Isodoc do
         .to raise_error(/does not support presentation XML/)
     end
   end
+
+  describe ".create" do
+    let(:converter) do
+      c = double("converter")
+      meta = double("meta")
+      allow(meta).to receive(:localdir=)
+      xrefs = double("xrefs")
+      klass = double("klass")
+      allow(klass).to receive(:meta=)
+      allow(klass).to receive(:localdir=)
+      allow(xrefs).to receive(:klass).and_return(klass)
+      allow(c).to receive(:init_i18n)
+      allow(c).to receive(:i18n_init).and_return(double("i18n"))
+      allow(c).to receive(:metadata_init)
+      allow(c).to receive(:meta).and_return(meta)
+      allow(c).to receive(:xref_init)
+      allow(c).to receive(:xrefs).and_return(xrefs)
+      allow(c).to receive(:info)
+      c
+    end
+
+    it "resolves the converter for the flavor and initialises it" do
+      allow(described_class).to receive(:resolve_converter)
+        .with(:demo, presxml: true).and_return(converter)
+      result = described_class.create(:demo, lang: "en", script: "Latn")
+      expect(described_class).to have_received(:resolve_converter)
+        .with(:demo, presxml: true)
+      expect(converter).to have_received(:init_i18n)
+      expect(result).to equal(converter)
+    end
+
+    it "forwards locale, i18nyaml, xml, localdir kwargs through to init" do
+      allow(described_class).to receive(:resolve_converter).and_return(converter)
+      xml = double("xml")
+      described_class.create(:demo, lang: "en", script: "Latn",
+                                    locale: "GB", i18nyaml: "/p.yaml",
+                                    xml: xml, localdir: "/dir")
+      expect(converter).to have_received(:init_i18n).with(
+        i18nyaml: "/p.yaml", language: "en", script: "Latn", locale: "GB",
+      )
+      expect(converter.meta).to have_received(:localdir=).with("/dir")
+      expect(converter).to have_received(:info).with(xml, nil)
+    end
+
+    it "honours presxml: false on resolve_converter" do
+      allow(described_class).to receive(:resolve_converter)
+        .with(:demo, presxml: false).and_return(converter)
+      described_class.create(:demo, lang: "en", script: "Latn",
+                                    presxml: false)
+      expect(described_class).to have_received(:resolve_converter)
+        .with(:demo, presxml: false)
+    end
+  end
 end
