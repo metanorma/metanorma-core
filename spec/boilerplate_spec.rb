@@ -109,6 +109,49 @@ RSpec.describe Metanorma::Core::Boilerplate do
     end
   end
 
+  describe ".docidentifier_boilerplate_isodoc" do
+    let(:doc) do
+      Nokogiri::XML(<<~XML)
+        <bibdata>
+          <docidentifier boilerplate="true">{{x}}-97</docidentifier>
+          <docidentifier boilerplate="false">RAW-VALUE</docidentifier>
+          <docidentifier>NO-ATTR</docidentifier>
+        </bibdata>
+      XML
+    end
+
+    it "substitutes only docidentifiers with boilerplate='true' " \
+       "and removes the attribute from all matched elements" do
+      # Echo the post-Liquid input back through Asciidoctor stub so we can
+      # assert on substituted text rather than the SECTIONS_XML sentinel.
+      allow(::Asciidoctor).to receive(:convert) do |content, _opts|
+        body = content.split("\n\n").last.to_s.strip
+        %(<doc xmlns="http://x"><sections><p>#{body}</p></sections></doc>)
+      end
+      iso = IsodocDouble.new(substitutions: { "{{x}}" => "S" })
+      described_class.docidentifier_boilerplate_isodoc(
+        doc, iso, lang: "en", script: "Latn", backend: :html5,
+      )
+      ids = doc.xpath("//docidentifier")
+      expect(ids[0].text).to include("S-97")
+      expect(ids[0].attributes).not_to include("boilerplate")
+      expect(ids[1].text).to eq("RAW-VALUE")
+      expect(ids[1].attributes).not_to include("boilerplate")
+      expect(ids[2].text).to eq("NO-ATTR")
+    end
+
+    it "is a no-op when there are no @boilerplate docidentifiers" do
+      doc2 = Nokogiri::XML(
+        "<bibdata><docidentifier>NO-ATTR</docidentifier></bibdata>",
+      )
+      expect(::Asciidoctor).not_to receive(:convert)
+      described_class.docidentifier_boilerplate_isodoc(
+        doc2, IsodocDouble.new,
+        lang: "en", script: "Latn", backend: :html5,
+      )
+    end
+  end
+
   describe ".adoc2xml" do
     it "returns input verbatim when input is already valid XML" do
       xml = "<root xmlns='http://example.com'><p>hi</p></root>"
