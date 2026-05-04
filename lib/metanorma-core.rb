@@ -10,6 +10,7 @@ require "metanorma/registry/registry"
 require "metanorma/asciidoctor_extensions"
 require "metanorma/core/flavor_loader"
 require "metanorma/core/isodoc"
+require "metanorma/core/boilerplate"
 
 module Metanorma
 end
