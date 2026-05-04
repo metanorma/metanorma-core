@@ -108,7 +108,10 @@ module Metanorma
       # +<p>+ was produced).
       #
       # @param xmldoc [Nokogiri::XML::Document, Nokogiri::XML::Node]
-      #   The document or subtree to scan.
+      #   The document or subtree to scan. **Mutated in place**: every
+      #   matched +<docidentifier @boilerplate>+ has its
+      #   +@boilerplate+ attribute stripped, and (when its value was
+      #   +"true"+) its content replaced with the substituted output.
       # @param isodoc [#populate_template, #i18n] Isodoc instance, see
       #   {#boilerplate_snippet_convert}.
       # @param lang [String] see {#boilerplate_snippet_convert}.
@@ -118,6 +121,7 @@ module Metanorma
       # @param localdir [String, nil] see {#boilerplate_snippet_convert}.
       # @return [Nokogiri::XML::Document, Nokogiri::XML::Node] The
       #   input +xmldoc+, mutated in place.
+      # @see .docidentifier_templates?
       def docidentifier_boilerplate_isodoc(xmldoc, isodoc, lang:, script:,
                                            backend:, flush_caches: false,
                                            localdir: nil)
@@ -134,6 +138,20 @@ module Metanorma
           d.children = p_node ? p_node.children.to_xml : id
         end
         xmldoc
+      end
+
+      # Predicate: are there any +<docidentifier @boilerplate="true">+
+      # nodes in +xmldoc+ that {#docidentifier_boilerplate_isodoc} would
+      # substitute? Callers use this to decide whether to refresh
+      # downstream state (e.g. re-seed +isodoc.meta+ from the resolved
+      # bibdata) after the substitution pass — cheap pre-check, avoids
+      # depending on a return-value side channel from the mutating
+      # substitution method.
+      #
+      # @param xmldoc [Nokogiri::XML::Document, Nokogiri::XML::Node]
+      # @return [Boolean]
+      def docidentifier_templates?(xmldoc)
+        xmldoc.xpath("//docidentifier[@boilerplate = 'true']").any?
       end
 
       # Wrap +text+ in the standard headless dummy document used across

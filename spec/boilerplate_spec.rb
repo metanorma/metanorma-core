@@ -140,6 +140,27 @@ RSpec.describe Metanorma::Core::Boilerplate do
       expect(ids[2].text).to eq("NO-ATTR")
     end
 
+    describe ".docidentifier_templates?" do
+      it "returns true when at least one boilerplate=true element is present" do
+        d = Nokogiri::XML(
+          "<bibdata><docidentifier boilerplate='true'>X</docidentifier></bibdata>",
+        )
+        expect(described_class.docidentifier_templates?(d)).to be true
+      end
+
+      it "returns false for boilerplate=false (just a marker, not a template)" do
+        d = Nokogiri::XML(
+          "<bibdata><docidentifier boilerplate='false'>X</docidentifier></bibdata>",
+        )
+        expect(described_class.docidentifier_templates?(d)).to be false
+      end
+
+      it "returns false when there is no @boilerplate attribute" do
+        d = Nokogiri::XML("<bibdata><docidentifier>X</docidentifier></bibdata>")
+        expect(described_class.docidentifier_templates?(d)).to be false
+      end
+    end
+
     it "is a no-op when there are no @boilerplate docidentifiers" do
       doc2 = Nokogiri::XML(
         "<bibdata><docidentifier>NO-ATTR</docidentifier></bibdata>",
