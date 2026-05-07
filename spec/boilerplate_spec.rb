@@ -161,6 +161,26 @@ RSpec.describe Metanorma::Core::Boilerplate do
       end
     end
 
+    it "removes <docidentifier> when the rendered template is blank" do
+      doc3 = Nokogiri::XML(<<~XML)
+        <bibdata>
+          <docidentifier boilerplate="true">{{x}}</docidentifier>
+          <docidentifier boilerplate="true">{{x}}-97</docidentifier>
+        </bibdata>
+      XML
+      allow(::Asciidoctor).to receive(:convert) do |content, _opts|
+        body = content.split("\n\n").last.to_s.strip
+        %(<doc xmlns="http://x"><sections><p>#{body}</p></sections></doc>)
+      end
+      iso = IsodocDouble.new(substitutions: { "{{x}}" => "" })
+      described_class.docidentifier_boilerplate_isodoc(
+        doc3, iso, lang: "en", script: "Latn", backend: :html5,
+      )
+      ids = doc3.xpath("//docidentifier")
+      expect(ids.size).to eq(1)
+      expect(ids[0].text).to include("-97")
+    end
+
     it "is a no-op when there are no @boilerplate docidentifiers" do
       doc2 = Nokogiri::XML(
         "<bibdata><docidentifier>NO-ATTR</docidentifier></bibdata>",

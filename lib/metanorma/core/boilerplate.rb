@@ -135,7 +135,20 @@ module Metanorma
             flush_caches: flush_caches, localdir: localdir,
           )
           p_node = Nokogiri::XML(id).at("//p")
-          d.children = p_node ? p_node.children.to_xml : id
+          new_children = p_node ? p_node.children.to_xml : id
+          # If the rendered template is blank (e.g. a Liquid template
+          # that gates on a missing docnumeric), drop the
+          # <docidentifier> entirely instead of leaving an empty
+          # element behind. Downstream Relaton flavours
+          # (relaton-iho, relaton-cc, …) eagerly call Pubid::*::Identifier.parse
+          # on the docidentifier content; an empty string is truthy
+          # in Ruby and would crash that parser, so the empty element
+          # must not survive this pass.
+          if new_children.to_s.strip.empty?
+            d.remove
+          else
+            d.children = new_children
+          end
         end
         xmldoc
       end
