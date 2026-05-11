@@ -1,2 +1,13 @@
 = metanorma-core
 Core repository for plugin dependencies of Metanorma
+
+image:https://img.shields.io/gem/v/metanorma-core.svg["Gem Version", link="https://rubygems.org/gems/metanorma-core"]
+image:https://github.com/metanorma/metanorma-core/workflows/rake/badge.svg["Build Status", link="https://github.com/metanorma/metanorma-core/actions?query=workflow%3Arake"]
+// image:https://codeclimate.com/github/metanorma/metanorma-core/badges/gpa.svg["Code Climate", link="https://codeclimate.com/github/metanorma/metanorma-core"]
+image:https://img.shields.io/github/issues-pr-raw/metanorma/metanorma-core.svg["Pull Requests", link="https://github.com/metanorma/metanorma-core/pulls"]
+image:https://img.shields.io/github/commits-since/metanorma/metanorma-core/latest.svg["Commits since latest",link="https://github.com/metanorma/metanorma-core/releases"]
+
+== Purpose
+
+This is a core repository for plugin dependencies of Metanorma, allowing metanorma-standoc and metanorma to share code without circular dependencies.
+
