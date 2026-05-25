@@ -27,6 +27,7 @@ Gem::Specification.new do |spec|
 
   spec.add_dependency "asciidoctor"
   spec.add_dependency "metanorma-taste", "~> 1.0.0"
+  spec.add_dependency "metanorma-utils"
   spec.add_dependency "nokogiri"
 
   spec.add_development_dependency "debug"
