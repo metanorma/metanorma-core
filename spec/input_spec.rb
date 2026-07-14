@@ -84,7 +84,8 @@ RSpec.describe Metanorma::Input::Asciidoc do
                relatonrenderconfig: "be", scripts: "i", scripts_override: "z",
                scripts_pdf: "j", sectionsplit: "a", sourcehighlighter: true,
                standardstylesheet: "l", suppressasciimathdup: true,
-               titlefont: "d", tocfigures: true, toclevels: "ba",
+               titlefont: "d", tocexamples: false, tocfigures: true,
+               toclevels: "ba",
                tocrecommendations: true, toctables: true, ulstyle: "p",
                usexinclude: true, wordcoverpage: "n", wordintropage: "o",
                wordstylesheet: "k", wordstylesheet_override: "y" }
@@ -167,7 +168,7 @@ RSpec.describe Metanorma::Input::Asciidoc do
     output =
       { breakupurlsintables: false, datauriimage: true,
         hierarchicalassets: false, sourcehighlighter: true,
-        suppressasciimathdup: true, tocfigures: false,
+        suppressasciimathdup: true, tocexamples: false, tocfigures: false,
         tocrecommendations: false, toctables: false, usexinclude: true }
     expect(Metanorma::Input::Asciidoc.new
       .extract_options(input)).to eq output
@@ -183,6 +184,7 @@ RSpec.describe Metanorma::Input::Asciidoc do
       :suppress-asciimath-dup:
       :toc-tables:
       :toc-figures:
+      :toc-examples:
       :toc-recommendations
       :datauriimage:
       :source-highlighter:
@@ -190,7 +192,7 @@ RSpec.describe Metanorma::Input::Asciidoc do
     output =
       { breakupurlsintables: true, datauriimage: true,
         hierarchicalassets: true, sourcehighlighter: true,
-        suppressasciimathdup: true, tocfigures: true,
+        suppressasciimathdup: true, tocexamples: true, tocfigures: true,
         tocrecommendations: false, toctables: true, usexinclude: true }
     expect(Metanorma::Input::Asciidoc.new
       .extract_options(input)).to eq output
@@ -206,6 +208,7 @@ RSpec.describe Metanorma::Input::Asciidoc do
       :suppress-asciimath-dup: true
       :toc-tables: false
       :toc-figures: false
+      :toc-examples: false
       :toc-recommendations: false
       :data-uri-image: false
       :source-highlighter: false
@@ -213,7 +216,7 @@ RSpec.describe Metanorma::Input::Asciidoc do
     output =
       { breakupurlsintables: true, datauriimage: false,
         hierarchicalassets: false, sourcehighlighter: false,
-        suppressasciimathdup: true, tocfigures: false,
+        suppressasciimathdup: true, tocexamples: false, tocfigures: false,
         tocrecommendations: false, toctables: false, usexinclude: false }
     expect(Metanorma::Input::Asciidoc.new
       .extract_options(input)).to eq output

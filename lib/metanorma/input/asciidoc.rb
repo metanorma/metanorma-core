@@ -115,7 +115,7 @@ module Metanorma
       # attribute is bare (no value).
       EMPTY_ADOC_OPTIONS_DEFAULT_FALSE =
         %w(hierarchical-assets break-up-urls-in-tables toc-figures
-           toc-tables toc-recommendations).freeze
+           toc-tables toc-recommendations toc-examples).freeze
 
       # Convert an Asciidoc-style attribute name (kebab-case, possibly
       # ending in +-override+ or +-pdf+) into the Ruby symbol used in
