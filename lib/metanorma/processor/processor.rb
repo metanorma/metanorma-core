@@ -70,6 +70,29 @@ module Metanorma
       {}
     end
 
+    # The flavor's own {#document_transformers}, merged with the document-model
+    # specs contributed by the active taste (+options[:supplied_type]+). Those
+    # specs come from +Metanorma::TasteRegister+ when it supports the per-taste
+    # hook; base flavors (no taste), and installed tastes without the hook, are
+    # unaffected -- the base map is returned unchanged. {#document_transformers}
+    # stays zero-arg (flavors override it) and the taste specs are merged on
+    # top. No per-build state is kept on the shared processor instance: the
+    # taste identity rides entirely on +options[:supplied_type]+.
+    #
+    # @param options [Hash] processor options; reads +:supplied_type+.
+    # @return [Hash{Symbol => Hash}] merged format symbol -> spec.
+    def effective_document_transformers(options = {})
+      base = document_transformers
+      taste = options[:supplied_type]
+      unless taste && defined?(Metanorma::TasteRegister) &&
+          Metanorma::TasteRegister.respond_to?(:document_transformers_for)
+        return base
+      end
+
+      contributed = Metanorma::TasteRegister.document_transformers_for(taste)
+      base.merge(contributed || {})
+    end
+
     # Convert an input file to Metanorma semantic XML by routing it
     # through the {Metanorma::Input::Asciidoc} processor with this
     # processor's Asciidoctor backend. Override for non-Asciidoc
@@ -131,9 +154,10 @@ module Metanorma
     #   string (document-model leg).
     def output(isodoc_node, inname, outname, format, options = {})
       options_preprocess(options)
-      if document_transformers.key?(format)
+      transformers = effective_document_transformers(options)
+      if transformers.key?(format)
         render_via_document_model(isodoc_node, inname, outname, format,
-                                  options)
+                                  options, transformers.fetch(format))
       else
         File.open(outname, "w:UTF-8") { |f| f.write(isodoc_node) }
       end
@@ -155,9 +179,13 @@ module Metanorma
     #   {#document_transformers}.
     # @param options [Hash] processor options, passed to the transformer and
     #   post-processor.
+    # @param spec [Hash, nil] pre-resolved transformer spec; when nil it is
+    #   resolved from {#effective_document_transformers} (so callers that pass
+    #   the old five-argument signature still work).
     # @return [String] the serialised (and post-processed) output XML.
-    def render_via_document_model(isodoc_node, inname, outname, format, options)
-      spec = document_transformers.fetch(format)
+    def render_via_document_model(isodoc_node, inname, outname, format, options,
+                                  spec = nil)
+      spec ||= effective_document_transformers(options).fetch(format)
       xml = document_model_input_xml(isodoc_node, inname)
       xml = xml.gsub(/\sxmlns="[^"]*"/, "") if spec[:strip_default_namespace]
       transformer = spec.fetch(:transformer)

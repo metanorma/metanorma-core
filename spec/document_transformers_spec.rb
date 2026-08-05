@@ -1,5 +1,6 @@
 require_relative "spec_helper"
 require "tmpdir"
+require "metanorma/taste_register"
 
 # --- test doubles for the document-model publishing leg ------------------
 # A reader that records the XML string it was handed and wraps it in a model.
@@ -131,5 +132,54 @@ RSpec.describe "Metanorma::Processor document-model leg" do
     options = {}
     processor.output("<r>S</r>", "in.xml", out, :dt, options)
     expect(options[:output_formats]).to eq(processor.output_formats)
+  end
+end
+
+RSpec.describe "Metanorma::Processor#effective_document_transformers" do
+  let(:processor) { DTProcessor.new }
+  around { |ex| Dir.mktmpdir { |d| @dir = d; ex.run } }
+  let(:out) { File.join(@dir, "o.xml") }
+
+  # Real stand-in for the per-taste hook that metanorma-taste provides (no
+  # mocking library, matching the doubles-free style above): define
+  # +document_transformers_for+ on the real TasteRegister, backed by a
+  # test-controlled table, for the duration of these examples.
+  before do
+    specs = (@taste_specs = {})
+    hook = ->(taste) { specs[taste] || {} }
+    Metanorma::TasteRegister.singleton_class
+      .send(:define_method, :document_transformers_for, &hook)
+  end
+
+  after do
+    Metanorma::TasteRegister.singleton_class
+      .send(:remove_method, :document_transformers_for)
+  end
+
+  it "adds nothing when no taste is active" do
+    expect(processor.effective_document_transformers({}).keys)
+      .to contain_exactly(:dt, :dtmin)
+  end
+
+  it "adds nothing for a taste that contributes no transformers" do
+    expect(processor.effective_document_transformers(supplied_type: :iso).keys)
+      .to contain_exactly(:dt, :dtmin)
+  end
+
+  it "merges the active taste's specs on top of the flavor's" do
+    @taste_specs[:oiml] =
+      { oimlsts: { reader: DTReader, transformer: DTTransformer } }
+    eff = processor.effective_document_transformers(supplied_type: :oiml)
+    expect(eff.keys).to include(:dt, :dtmin, :oimlsts)
+    expect(eff[:oimlsts][:transformer]).to eq(DTTransformer)
+  end
+
+  it "routes a taste-contributed format through the document-model driver" do
+    @taste_specs[:oiml] =
+      { oimlsts: { reader: DTReader, transformer: DTTransformer } }
+    ret = processor.output("<r>OIML</r>", "in.xml", out, :oimlsts,
+                           supplied_type: :oiml)
+    expect(DTReader.last_xml).to include("OIML")
+    expect(File.read(out)).to eq(ret)
   end
 end
