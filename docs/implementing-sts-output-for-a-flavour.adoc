@@ -1,0 +1,405 @@
+= Implementing STS output for a Metanorma flavour
+:toc: macro
+:toclevels: 3
+
+toc::[]
+
+== Purpose and audience
+
+This is a developer guide for implementing https://www.niso.org/standards-committees/sts[NISO STS] /
+ISO STS output for a Metanorma flavour *from scratch*, using the metanorma-core
+_document-model output leg_.
+
+It is written for metanorma-core maintainers and flavour/taste contributors — the
+people who add a new semantic-XML-to-STS output format to a flavour. It is not an
+author guide: authors selecting STS output for an existing flavour need only the
+document attribute (e.g. `:output-extensions:`) documented on metanorma.org.
+
+The mechanism described here is the *Feature B* document-model convergence
+(metanorma-core#12): a flavour or taste declares two classes — a *reader* and a
+*transformer* — and metanorma-core drives the read/transform/serialise chain. No
+flavour re-implements the output plumbing, and metanorma-core never depends on the
+STS artefact gem.
+
+The worked examples are the two production adoptions:
+
+* *OIML* — STS contributed by the OIML *taste* over the ISO base flavour
+  (metanorma-oiml + metanorma-taste).
+* *ISO* — STS native to the *flavour* (metanorma-iso).
+
+== The big picture
+
+Metanorma builds a document in stages:
+
+[source]
+----
+input.adoc --> semantic XML --> (presentation XML) --> output (HTML/PDF/DOCX/STS/...)
+----
+
+Most rendered outputs (HTML, PDF, DOCX) are generated from *presentation XML* — the
+semantic XML enriched with rendering metadata. STS can be generated from *either*
+leg, depending on what your STS transformer consumes. metanorma-core's default treats
+STS as a *semantic*-leg format, and ISO's native `isosts` does exactly that; but a
+flavour or taste whose STS transformer needs the rendered presentation XML can opt
+into the *presentation* leg, as the OIML taste's `oimlsts` does. You declare the leg
+(see <<step-3-make-the-format-selectable>>).
+
+The document-model output leg turns that "semantic XML -> STS XML" step into a
+declarative contract. A flavour declares, per output format:
+
+* a *reader* that parses the input XML string into a document model, and
+* a *transformer* that maps that model to the STS model and serialises it.
+
+metanorma-core's `Processor#output` recognises the format and runs the chain
+(`Processor#render_via_document_model`), so the flavour ships two classes instead of
+bespoke output code.
+
+== The contract
+
+The contract is `Metanorma::Processor#document_transformers`
+(`metanorma-core/lib/metanorma/processor/processor.rb`). It returns a hash mapping an
+output-format symbol to a spec:
+
+[source,ruby]
+----
+def document_transformers
+  {
+    myflavoursts: {
+      reader: MyFlavour::Sts::SourceDocument,     # required
+      transformer: MyFlavour::Sts::Standard,      # required
+      to_xml_options: {},                         # default {}
+      strip_default_namespace: false,             # default false
+      post_process: nil,                          # default identity
+    },
+  }
+end
+----
+
+Spec keys (metanorma-core contract):
+
+`:reader`:: (required) responds to `.from_xml(String) -> model`. Parses the input
+XML into a document model.
+
+`:transformer`:: (required) responds to `.new(model, options)`; the instance responds
+to `#transform -> target`, and the target responds to `#to_xml`. See
+<<the-adapter-pattern>>.
+
+`:to_xml_options`:: hash splatted into `target.to_xml(**opts)` (default `{}`).
+
+`:strip_default_namespace`:: strip `xmlns="..."` from the input XML before
+`from_xml` (default `false`). Set `true` when your reader's model does not expect the
+Metanorma default namespace on the root.
+
+`:post_process`:: a callable `(xml, transformer, options) -> xml` run on the
+serialised string (default identity). Use it for namespace / processing-metadata /
+language fix-ups that must happen on the serialised output.
+
+Two further keys are read by the *metanorma compile driver* (not by metanorma-core)
+to make the format selectable; see <<step-3-make-the-format-selectable>>:
+
+`:suffix`:: the output filename suffix, e.g. `"oiml.sts.xml"`.
+
+`:presentation`:: `true` if the format is generated from *presentation* XML;
+omit/`false` for the *semantic* leg. Per-transformer choice: OIML's `oimlsts` sets
+`true`, ISO's native `isosts` uses the semantic leg.
+
+=== How metanorma-core drives it
+
+`Processor#output` routes any registered format through the document-model leg:
+
+[source,ruby]
+----
+def output(isodoc_node, inname, outname, format, options = {})
+  options_preprocess(options)
+  transformers = effective_document_transformers(options)
+  if transformers.key?(format)
+    render_via_document_model(isodoc_node, inname, outname, format,
+                              options, transformers.fetch(format))
+  else
+    File.open(outname, "w:UTF-8") { |f| f.write(isodoc_node) }
+  end
+end
+----
+
+`render_via_document_model` is the whole chain, duck-typed — it never names a
+concrete reader/transformer/model gem, so those stay out of metanorma-core's
+dependencies:
+
+[source,ruby]
+----
+xml = document_model_input_xml(isodoc_node, inname)       # semantic or presentation leg
+xml = xml.gsub(/\sxmlns="[^"]*"/, "") if spec[:strip_default_namespace]
+transformer = spec.fetch(:transformer)
+  .new(spec.fetch(:reader).from_xml(xml), options)
+out = transformer.transform.to_xml(**(spec[:to_xml_options] || {}))
+out = spec[:post_process].call(out, transformer, options) if spec[:post_process]
+----
+
+The input XML comes from `isodoc_node` (the semantic leg) or, when that is nil, from
+reading `inname` (the presentation leg). Which leg fires is governed by
+`use_presentation_xml`. The metanorma-core default treats STS and RFC as semantic-leg
+formats:
+
+[source,ruby]
+----
+def use_presentation_xml(ext)     # metanorma-core default
+  case ext
+  when :html, :doc, :pdf then true
+  else false   # STS, RFC, ... default to the semantic leg
+  end
+end
+----
+
+A flavour overrides this per format. ISO keeps `isosts` on the semantic leg when its
+native STS is enabled (and falls back to the presentation leg for the legacy path):
+
+[source,ruby]
+----
+def use_presentation_xml(ext)     # metanorma-iso
+  return false if ext == :isosts && Metanorma::Iso::Sts.enabled?  # native STS: semantic
+  return true if %i[html_alt sts isosts].include?(ext)            # legacy path: presentation
+  super
+end
+----
+
+A *taste* declares the leg instead through the `:presentation` key of its spec (Route
+B); OIML sets `presentation: true`, putting `oimlsts` on the presentation leg. Pick
+the leg your transformer actually consumes.
+
+[#the-adapter-pattern]
+== Step 1 — Build the STS transformer (in the artefact gem)
+
+The reader and transformer live in the flavour's *artefact gem* (e.g.
+metanorma-oiml), never in metanorma-core.
+
+=== The reader
+
+The reader responds to `.from_xml(String) -> model`. In practice this is a thin
+entry point on your source-document model:
+
+[source,ruby]
+----
+module Metanorma::Oiml::Sts::Transformer
+  class SourceDocument
+    def self.from_xml(input)
+      parse(input)   # -> a SourceDocument model instance
+    end
+  end
+end
+----
+
+=== The transformer (adapter)
+
+The transformer must satisfy: `.new(model, options)`, `#transform -> target`, and
+`target#to_xml`. The cleanest way to meet this while reusing an existing conversion
+pipeline is the *adapter-is-its-own-target* pattern from metanorma-oiml
+(`lib/metanorma/oiml/sts/transformer/standard.rb`):
+
+[source,ruby]
+----
+class Standard
+  def initialize(model, options = {})
+    @model = model
+    @options = options
+  end
+
+  def transform
+    @document_transformer = DocumentTransformer.new(Context.new(@model))
+    self                      # the adapter is its own #to_xml target
+  end
+
+  def to_xml(**_options)
+    @document_transformer.transform_to_xml(@model)   # full existing pipeline
+  end
+end
+----
+
+`#to_xml` runs the *full* existing conversion pipeline (model build plus the
+namespace / processing-metadata / language post-processing on the serialised
+string), so the driven output is byte-identical to the gem's standalone converter
+(`Metanorma::Oiml::Sts::Transformer.convert`). Returning the raw `#transform` model
+instead would drop that post-processing — a common trap.
+
+TIP: If your gem already has a standalone `convert` (or an `oiml-sts`-style CLI),
+make the adapter's output byte-equal to it and add a byte-equivalence test. That is
+your safety net that the unified path did not change behaviour.
+
+== Step 2 — Register the format
+
+There are two registration routes. Choose by *what owns the flavour*.
+
+=== Route A — flavour-native (the flavour has its own Processor)
+
+If STS belongs to the flavour itself (ISO), override `document_transformers` on the
+flavour's `Metanorma::Processor` subclass:
+
+[source,ruby]
+----
+module Metanorma::Iso
+  class Processor < Metanorma::Processor
+    def document_transformers
+      {
+        isosts: {
+          reader: Metanorma::Iso::Sts::SourceDocument,
+          transformer: Metanorma::Iso::Sts::Standard,
+        },
+      }
+    end
+  end
+end
+----
+
+This is zero-arg and static: the flavour always offers the format.
+
+=== Route B — taste-contributed (a taste over a base flavour)
+
+If STS belongs to a *taste* over a base flavour (OIML is a taste over ISO), the taste
+contributes the spec through the per-taste hook in metanorma-taste, *without*
+metanorma-taste depending on the artefact gem.
+
+Declare a `data/<taste>/transformers.rb` shim in the taste gem
+(metanorma-taste/data/oiml/transformers.rb):
+
+[source,ruby]
+----
+Metanorma::TasteRegister.register_document_transformers(:oiml) do
+  require "metanorma/oiml/sts"          # loaded lazily — only for OIML builds
+
+  {
+    oimlsts: {
+      reader: Metanorma::Oiml::Sts::Transformer::SourceDocument,
+      transformer: Metanorma::Oiml::Sts::Transformer::Standard,
+      strip_default_namespace: false,
+      to_xml_options: {},
+      suffix: "oiml.sts.xml",           # compile-driver keys (Step 3)
+      presentation: true,
+    },
+  }
+end
+----
+
+How the hook works (`metanorma-taste/lib/metanorma/taste_register.rb`):
+
+* `register_document_transformers(taste, &block)` stores the block, keyed by taste.
+* `document_transformers_for(taste)` is memoised: on first use it requires the taste's
+  `data/<taste>/transformers.rb` shim (`load_transformer_hook`), then calls the block.
+* Because the `require "metanorma/oiml/sts"` sits *inside* the block, the artefact gem
+  loads only for builds that use the taste. metanorma-taste keeps no hard dependency
+  on it. If the shim declares transformers but the artefact gem is not in the bundle,
+  the hook raises `UnknownTasteError` telling the user to add it.
+
+The taste-aware `Processor#effective_document_transformers` then merges the taste's
+specs onto the flavour's `document_transformers`, keyed by `options[:supplied_type]`
+(the active taste). Base flavours and tastes without the hook are unaffected:
+
+[source,ruby]
+----
+def effective_document_transformers(options = {})
+  base = document_transformers
+  taste = options[:supplied_type]
+  unless taste && defined?(Metanorma::TasteRegister) &&
+      Metanorma::TasteRegister.respond_to?(:document_transformers_for)
+    return base
+  end
+  base.merge(Metanorma::TasteRegister.document_transformers_for(taste) || {})
+end
+----
+
+NOTE: `supplied_type` is the seam that carries taste identity to the shared, stateless
+processor. No per-build state is kept on the processor instance.
+
+[#step-3-make-the-format-selectable]
+== Step 3 — Make the format selectable in the compile driver
+
+For a user to request the format (e.g. `:output-extensions: oimlsts`), the metanorma
+compile driver must know its suffix and which leg it uses. This is threaded via
+`supplied_type` (`metanorma/lib/metanorma/compile/compile_options.rb`):
+
+* `supplied_type` originates from `options[:type]` and is copied into the isodoc
+  options (`copy_isodoc_options_attrs`: `ret[:supplied_type] = options[:supplied_type]`),
+  so the taste-aware processor sees it.
+* `effective_output_formats` merges the processor's `output_formats` with the
+  `:suffix` of each taste-contributed format, so the format passes extension
+  validation and gets an output filename:
++
+[source,ruby]
+----
+def effective_output_formats(options)
+  @processor.output_formats.merge(
+    taste_transformers(options).transform_values { |s| s[:suffix] }.compact,
+  )
+end
+----
+* `uses_presentation_xml?` honours both the processor's answer and the taste spec's
+  `:presentation` flag:
++
+[source,ruby]
+----
+def uses_presentation_xml?(ext, options)
+  @processor.use_presentation_xml(ext) ||
+    (taste_transformers(options)[ext] || {})[:presentation] == true
+end
+----
+
+For a *flavour-native* format (Route A), the compile driver reads the same keys off
+the flavour's own `document_transformers`; set `:suffix` there too if the format is
+user-selectable, and override `use_presentation_xml` to pick the leg (ISO's `isosts`
+returns `false` for the semantic leg).
+
+== Step 4 — Deprecate the standalone converter (optional)
+
+If the artefact gem had a standalone STS converter or CLI (e.g. `oiml-sts convert`),
+deprecate it in favour of the unified path once the driver is in place. Keep the code
+(the adapter delegates to it) but emit a deprecation notice from the old CLI entry
+points, and document the metanorma-driven path as canonical. metanorma-oiml#24 is the
+reference.
+
+== Conforming to the official STS specifications
+
+The transformer must emit *conformant* STS. Source the normative models from:
+
+* *NISO STS* — ANSI/NISO Z39.102, the NISO Standards Tag Suite.
+* *ISO STS* — the ISO profile/extension of NISO STS.
+
+Model the transformer's output against these tag sets (element/attribute names,
+allowed content models, metadata blocks). Validate generated output against the STS
+DTD/schema as part of your test suite; do not rely on visual inspection of the PDF/
+HTML, which can look correct while the STS XML is non-conformant.
+
+== Testing (smoke tests)
+
+At minimum:
+
+. *Build test* — compile a small document requesting the new format and assert the
+  output file is produced with the expected suffix and a well-formed STS root.
+. *Byte-equivalence test* — assert the driven output equals the standalone converter's
+  output (guards the adapter, per <<the-adapter-pattern>>).
+. *Registration test* — for a taste, assert `document_transformers_for(:yourtaste)`
+  returns the spec and that `effective_document_transformers` merges it under
+  `supplied_type`.
+. *Schema validation* — validate the generated STS against the NISO/ISO STS schema.
+
+The OIML and ISO STS specs in metanorma-oiml / metanorma-iso are the templates.
+
+== Checklist
+
+[cols="1,3"]
+|===
+| Artefact gem | `reader` (`.from_xml`) + `transformer` (`Standard` adapter, byte-equal to standalone `convert`)
+| Registration | Route A: override `document_transformers` on the flavour Processor. Route B: `data/<taste>/transformers.rb` shim with a lazy `require`
+| Selectable | `:suffix` (+ `:presentation` only if presentation-leg) so the compile driver exposes it
+| Leg | Declare it per what your transformer consumes: semantic (`use_presentation_xml` `false`, e.g. ISO `isosts`) or presentation (`presentation: true`, e.g. OIML `oimlsts`)
+| Deprecate | old standalone converter/CLI emits a deprecation notice
+| Conformance | output validated against NISO/ISO STS schema
+| Tests | build + byte-equivalence + registration + schema
+|===
+
+== Reference
+
+* metanorma-core#12 — Feature B document-model convergence (design: Decision + Alignment)
+* metanorma-core#13 — taste-aware `Processor#effective_document_transformers`
+* metanorma/metanorma#589 — compile-driver output selection (`supplied_type`, `effective_output_formats`, `uses_presentation_xml?`)
+* metanorma/metanorma-iso#1610 — mature STS-ISO transformer adoption (flavour-native, Route A)
+* metanorma/metanorma-oiml#24 — STS core-driver adapter + `oiml-sts` CLI deprecation (Route B artefact)
+* metanorma/metanorma-taste#188 — per-taste hook + OIML `:oimlsts` registration
+* NISO STS (ANSI/NISO Z39.102) and ISO STS official specifications
