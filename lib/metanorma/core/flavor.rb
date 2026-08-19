@@ -75,6 +75,9 @@ module Metanorma
           return nil
         end
         Object.const_get(pubid_module.to_s)
+      rescue NameError
+        raise ArgumentError,
+              "Flavor #{name.inspect}: pubid module #{pubid_module} could "               "not be resolved — fix the flavor's registration"
       end
     end
   end
