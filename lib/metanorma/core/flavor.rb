@@ -69,6 +69,11 @@ module Metanorma
       def pubid_module_const
         return nil unless pubid_module
 
+        begin
+          require "pubid"
+        rescue LoadError
+          return nil
+        end
         Object.const_get(pubid_module.to_s)
       end
     end
