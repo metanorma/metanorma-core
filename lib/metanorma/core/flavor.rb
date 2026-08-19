@@ -24,7 +24,7 @@ module Metanorma
       def initialize(name:, base_flavor: nil, gem: nil, model_root: nil,
                      processor: nil, renderers: {}, pubid_module: nil,
                      branding_dir: nil, publisher_abbr: nil, doctype_map: {})
-        @name = name.to_sym
+        @name = name&.to_sym
         @base_flavor = base_flavor&.to_sym
         @gem = gem || "metanorma-#{name}"
         @model_root = model_root
