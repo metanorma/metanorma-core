@@ -55,15 +55,18 @@ module Metanorma
       end
 
       def model_root_class
-        return nil unless model_root
+        return @model_root_class if @model_root_class
 
-        return @model_root_class if defined?(@model_root_class)
-
-        @model_root_class = if model_root.is_a?(Class)
-                              model_root
-                            elsif Object.const_defined?(model_root)
-                              Object.const_get(model_root)
-                            end
+        # Never cache a miss: the flavor gem may load after the first
+        # lookup (lazy string roots resolve once the owning gem is
+        # required), and a cached nil would poison every later walk.
+        klass = if model_root.is_a?(Class)
+                  model_root
+                elsif model_root && Object.const_defined?(model_root)
+                  Object.const_get(model_root)
+                end
+        @model_root_class = klass
+        klass
       end
 
       def pubid_module_const
