@@ -11,3 +11,5 @@ image:https://img.shields.io/github/commits-since/metanorma/metanorma-core/lates
 
 This is a core repository for plugin dependencies of Metanorma, allowing metanorma-standoc and metanorma to share code without circular dependencies.
 
+
+<!-- canary: automerge stub verification, revert not needed -->
