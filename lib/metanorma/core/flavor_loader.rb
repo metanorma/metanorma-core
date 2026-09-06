@@ -27,6 +27,12 @@ module Metanorma
       #   taste alias matched).
       def taste2flavor(stdtype)
         stdtype = stdtype.to_sym
+        entry = Flavors.find(stdtype)
+        return entry.base_flavor if entry&.taste?
+
+        # Transitional: taste entries land in the table with
+        # metanorma-taste's restructure PR; until then fall back to
+        # TasteRegister.aliases. Removed in this branch's final commit.
         tastes = Metanorma::TasteRegister.instance.aliases
         tastes[stdtype] and stdtype = tastes[stdtype].to_sym
         stdtype
