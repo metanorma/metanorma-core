@@ -19,11 +19,12 @@ module Metanorma
     class Flavor
       attr_reader :name, :base_flavor, :gem, :model_root, :processor,
                   :renderers, :pubid_module, :branding_dir,
-                  :publisher_abbr, :doctype_map
+                  :publisher_abbr, :doctype_map, :semantic_input
 
       def initialize(name:, base_flavor: nil, gem: nil, model_root: nil,
                      processor: nil, renderers: {}, pubid_module: nil,
-                     branding_dir: nil, publisher_abbr: nil, doctype_map: {})
+                     branding_dir: nil, publisher_abbr: nil, doctype_map: {},
+                     semantic_input: false)
         @name = name&.to_sym
         @base_flavor = base_flavor&.to_sym
         @gem = gem || "metanorma-#{name}"
@@ -34,6 +35,7 @@ module Metanorma
         @branding_dir = branding_dir
         @publisher_abbr = publisher_abbr
         @doctype_map = doctype_map
+        @semantic_input = semantic_input
       end
 
       def taste? = !!base_flavor
