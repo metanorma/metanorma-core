@@ -5,15 +5,19 @@ module Metanorma
   module Util
     class << self
       # Print +message+ to stdout if +type+ is in
-      # {Metanorma::Configuration#logs}; abort the process if
-      # +type+ is +:fatal+ regardless of whether it was printed.
+      # {Metanorma::Configuration#logs}; abort the process with the
+      # message on stderr if +type+ is +:fatal+.
+      #
+      # The +:fatal+ message is written to stderr unconditionally: a
+      # fatal abort that only surfaces when the right log category is
+      # configured reads as a silent death of the process
+      # (metanorma/iso-10303#756).
       #
       # @param message [String] the message to print.
       # @param type [Symbol] severity, defaults to +:info+. Common
       #   values: +:info+, +:warning+, +:error+, +:fatal+. The
       #   configured +logs+ list determines which severities are
-      #   printed; +:fatal+ always aborts on top of (or instead of)
-      #   printing.
+      #   printed; +:fatal+ aborts with the message on top of printing.
       # @return [void]
       def log(message, type = :info)
         log_types = Metanorma.configuration.logs.map(&:to_s) || []
@@ -22,9 +26,8 @@ module Metanorma
           puts(message)
         end
 
-        if type == :fatal
-          abort
-        end
+        # Kernel#abort prints the message to stderr and exits 1.
+        abort(message) if type == :fatal
       end
 
       # Sort key used to put output-format extensions in execution order.
