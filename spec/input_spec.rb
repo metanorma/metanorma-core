@@ -267,4 +267,20 @@ RSpec.describe Metanorma::Input::Asciidoc do
     expect(Metanorma::Input::Asciidoc.new
       .extract_metanorma_options(input)).to eq output
   end
+
+  it "forwards novalid as a document attribute" do
+    Class.new(Asciidoctor::Converter::Base) do
+      register_for "novalidtest"
+      def convert(node, _transform = nil, _opts = {})
+        %(<root novalid="#{node.document.attr?('novalid')}"/>)
+      end
+    end
+    out = Metanorma::Input::Asciidoc.new
+      .process("= T\n\nbody", "t.adoc", :novalidtest, novalid: true)
+    expect(out).to include('novalid="true"')
+
+    out = Metanorma::Input::Asciidoc.new
+      .process("= T\n\nbody", "t.adoc", :novalidtest)
+    expect(out).to include('novalid="false"')
+  end
 end

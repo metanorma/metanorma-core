@@ -23,11 +23,16 @@ module Metanorma
       # @return [String] Asciidoctor convert output.
       def process(file, filename, type, options = {})
         require "asciidoctor"
+        attrs = ["nodoc", "stem", "docfile=#{filename}",
+                 "output_dir=#{options[:output_dir]}"]
+        # The converter reads novalid as a document ATTRIBUTE; the bare
+        # Asciidoctor option never reaches it, so --no-valid silently
+        # failed to skip validation (suma's --no-valid included).
+        attrs << "novalid" if options[:novalid]
         out_opts = { to_file: false, safe: :safe, backend: type,
                      header_footer: true, log: options[:log],
                      novalid: options[:novalid],
-                     attributes: ["nodoc", "stem", "docfile=#{filename}",
-                                  "output_dir=#{options[:output_dir]}"] }
+                     attributes: attrs }
         ::Asciidoctor.convert(file, out_opts)
       end
 
