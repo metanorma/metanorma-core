@@ -283,4 +283,64 @@ RSpec.describe Metanorma::Input::Asciidoc do
       .process("= T\n\nbody", "t.adoc", :novalidtest)
     expect(out).to include('novalid="false"')
   end
+
+  # 1x1 transparent PNG
+  PNG_DATA = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQV" \
+             "R42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=".freeze
+
+  it "anchors assets and the include jail at base_dir when given, not at the working directory" do
+    require "tmpdir"
+    require "fileutils"
+    Dir.mktmpdir do |dir|
+      member = File.join(dir, "member")
+      FileUtils.mkdir_p(member)
+      File.binwrite(File.join(member, "img.png"), PNG_DATA.unpack1("m"))
+      File.write(File.join(member, "inc.adoc"), "Included content here.\n")
+      docfile = File.join(member, "doc.adoc")
+      input = <<~INPUT
+        = T
+        :data-uri:
+
+        image::img.png[Alt]
+
+        include::inc.adoc[]
+      INPUT
+
+      FileUtils.mkdir_p(File.join(dir, "elsewhere"))
+      Dir.chdir(File.join(dir, "elsewhere")) do
+        out = Metanorma::Input::Asciidoc.new
+          .process(input, docfile, :html5, base_dir: member)
+        expect(out).to include("data:image/png;base64,#{PNG_DATA}")
+        expect(out).to include("Included content here.")
+        expect(out).not_to include("Unresolved directive")
+      end
+    end
+  end
+
+  it "anchors assets and the include jail at the working directory when no base_dir is given" do
+    require "tmpdir"
+    require "fileutils"
+    Dir.mktmpdir do |dir|
+      member = File.join(dir, "member")
+      FileUtils.mkdir_p(member)
+      File.write(File.join(member, "inc.adoc"), "Included content here.\n")
+      docfile = File.join(member, "doc.adoc")
+      input = <<~INPUT
+        = T
+
+        include::inc.adoc[]
+      INPUT
+
+      elsewhere = File.join(dir, "elsewhere")
+      FileUtils.mkdir_p(elsewhere)
+      Dir.chdir(elsewhere) do
+        out = Metanorma::Input::Asciidoc.new.process(input, docfile, :html5)
+        # The include target resolves against the process working
+        # directory, which holds no such file: the documented default
+        # until a compile opts into docfile anchoring.
+        expect(out).to include("Unresolved directive")
+        expect(out).not_to include("Included content here.")
+      end
+    end
+  end
 end
