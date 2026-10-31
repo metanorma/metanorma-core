@@ -19,7 +19,10 @@ module Metanorma
       #   +:standoc+).
       # @param options [Hash] passthrough options. Recognised:
       #   +:log+ (Asciidoctor logger), +:novalid+ (skip validation),
-      #   +:output_dir+ (forwarded as the +output_dir+ attribute).
+      #   +:output_dir+ (forwarded as the +output_dir+ attribute),
+      #   +:base_dir+ (asset anchor: the directory that Asciidoctor
+      #   resolves relative asset paths against and jails includes
+      #   within; defaults to the process working directory).
       # @return [String] Asciidoctor convert output.
       def process(file, filename, type, options = {})
         require "asciidoctor"
@@ -33,6 +36,13 @@ module Metanorma
                      header_footer: true, log: options[:log],
                      novalid: options[:novalid],
                      attributes: attrs }
+        # A string conversion without base_dir anchors Asciidoctor at the
+        # process working directory: asset macro targets and the
+        # safe-mode include jail all resolve against it, making the
+        # compile output depend on where it was invoked from. An
+        # explicit base_dir anchors them at the given directory instead.
+        options[:base_dir] and
+          out_opts[:base_dir] = File.expand_path(options[:base_dir])
         ::Asciidoctor.convert(file, out_opts)
       end
 
