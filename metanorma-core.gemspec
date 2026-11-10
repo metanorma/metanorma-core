@@ -30,6 +30,11 @@ Gem::Specification.new do |spec|
   spec.add_dependency "metanorma-utils"
   spec.add_dependency "nokogiri", "~> 1.19"
 
+  # Bundled-gem successor required directly by lib code: registry.rb uses
+  # singleton. Ruby 4 warns on undeclared bundled gems and pruned bundles
+  # would fail (epic metanorma/metanorma#669).
+  spec.add_dependency "singleton"
+
   spec.add_development_dependency "debug"
   spec.add_development_dependency "rake", "~> 13.0"
   spec.add_development_dependency "rspec", "~> 3.6"
