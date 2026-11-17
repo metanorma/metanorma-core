@@ -284,6 +284,68 @@ RSpec.describe Metanorma::Input::Asciidoc do
     expect(out).to include('novalid="false"')
   end
 
+  # The stem attribute is passed as a soft set (`stem@`): it enables
+  # STEM syntax handling corpus-wide, but a document's own `:stem:`
+  # entry decides the flavor. A hard set clobbers `:stem: latexmath`
+  # with the empty default, and every stem then goes through the
+  # AsciiMath parser — mangling LaTeX source like \lceil into literal
+  # "\ l" runs (metanorma/isodoc#898).
+  it "enables stem handling while a document :stem: entry decides the flavor" do
+    Class.new(Asciidoctor::Converter::Base) do
+      register_for "stemflavortest"
+      def convert(node, _transform = nil, _opts = {})
+        %(<root stem="#{node.document.attributes['stem']}"/>)
+      end
+    end
+
+    # Document-supplied flavor survives the soft-set attribute.
+    out = Metanorma::Input::Asciidoc.new
+      .process("= T\n:stem: latexmath\n\nbody", "t.adoc", :stemflavortest)
+    expect(out).to include('stem="latexmath"')
+
+    # Without a document entry, STEM syntax handling is still enabled
+    # (empty value = Asciidoctor's default AsciiMath flavor).
+    out = Metanorma::Input::Asciidoc.new
+      .process("= T\n\nbody", "t.adoc", :stemflavortest)
+    expect(out).to include('stem=""')
+  end
+
+  it "keeps STEM block flavor resolution driven by the document :stem: entry" do
+    input = <<~INPUT
+      = T
+      :stem: latexmath
+
+      [stem]
+      ++++
+      x = 1
+      ++++
+    INPUT
+    Class.new(Asciidoctor::Converter::Base) do
+      register_for "stemblockflavortest"
+      def convert(node, _transform = nil, _opts = {})
+        stem = node.find_by(context: :stem).first
+        %(<root style="#{stem.style}"/>)
+      end
+    end
+    out = Metanorma::Input::Asciidoc.new
+      .process(input, "t.adoc", :stemblockflavortest)
+    expect(out).to include('style="latexmath"')
+
+    # The bare soft-set still applies when the document is silent;
+    # Asciidoctor resolves its empty default to the AsciiMath flavor.
+    input = <<~INPUT
+      = T
+
+      [stem]
+      ++++
+      x = 1
+      ++++
+    INPUT
+    out = Metanorma::Input::Asciidoc.new
+      .process(input, "t.adoc", :stemblockflavortest)
+    expect(out).to include('style="asciimath"')
+  end
+
   # 1x1 transparent PNG
   PNG_DATA = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQV" \
              "R42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=".freeze

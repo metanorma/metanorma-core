@@ -24,9 +24,18 @@ module Metanorma
       #   resolves relative asset paths against and jails includes
       #   within; defaults to the process working directory).
       # @return [String] Asciidoctor convert output.
+      # Enable STEM syntax handling (`stem:[...]`, `[stem]` blocks) for
+      # every compile, without deciding the STEM flavor on the
+      # document's behalf. The trailing `@` marks the attribute as a
+      # soft set: it applies only when the document itself does not
+      # carry a `:stem:` attribute entry. A hard set would clobber the
+      # document's `:stem: latexmath` with Asciidoctor's empty default,
+      # forcing every stem through the AsciiMath parser.
+      STEM_ENABLE_ATTR = "stem@".freeze
+
       def process(file, filename, type, options = {})
         require "asciidoctor"
-        attrs = ["nodoc", "stem", "docfile=#{filename}",
+        attrs = ["nodoc", STEM_ENABLE_ATTR, "docfile=#{filename}",
                  "output_dir=#{options[:output_dir]}"]
         # The converter reads novalid as a document ATTRIBUTE; the bare
         # Asciidoctor option never reaches it, so --no-valid silently
