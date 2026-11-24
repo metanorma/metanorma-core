@@ -92,4 +92,23 @@ RSpec.describe Metanorma::Core::Flavors do
     ))
     expect(described_class.flavor_for(document).name).to eq(:rspec_taste2)
   end
+
+  it "does not claim a document whose bibdata names no author abbreviation" do
+    role = Struct.new(:type)
+    org = Struct.new(:abbreviation)
+    contributor = Struct.new(:role, :organization)
+    bibdata = Struct.new(:contributor)
+    bib = bibdata.new([contributor.new([role.new("author")], org.new(nil))])
+    document = Class.new(String).new("")
+    document.define_singleton_method(:bibdata) { bib }
+
+    described_class.register(Metanorma::Core::Flavor.new(
+      name: :rspec_taste, base_flavor: :rspec_flavor, model_root: "String",
+      publisher_abbr: "IALA",
+    ))
+    described_class.register(Metanorma::Core::Flavor.new(
+      name: :rspec_flavor, model_root: "String", renderers: { html: Object },
+    ))
+    expect(described_class.flavor_for(document).name).to eq(:rspec_flavor)
+  end
 end
