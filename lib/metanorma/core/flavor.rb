@@ -17,14 +17,28 @@ module Metanorma
     # selection (publisher/profile/doctype). Returning nil falls through
     # to the next matching entry.
     class Flavor
+      LABELERS = %i[xref ladl].freeze
+
       attr_reader :name, :base_flavor, :gem, :model_root, :processor,
                   :renderers, :pubid_module, :branding_dir,
-                  :publisher_abbr, :doctype_map, :semantic_input
+                  :publisher_abbr, :doctype_map, :semantic_input,
+                  :labeler, :labelers
+
+      def self.labeler_choice(value)
+        return if value.nil?
+
+        choice = value.to_sym if value.is_a?(String) || value.is_a?(Symbol)
+        return choice if LABELERS.include?(choice)
+
+        raise ArgumentError,
+              "Unknown labeler #{value.inspect}; " \
+              "expected #{LABELERS.join(' or ')}"
+      end
 
       def initialize(name:, base_flavor: nil, gem: nil, model_root: nil,
                      processor: nil, renderers: {}, pubid_module: nil,
                      branding_dir: nil, publisher_abbr: nil, doctype_map: {},
-                     semantic_input: false)
+                     semantic_input: false, labeler: nil, labelers: {})
         @name = name&.to_sym
         @base_flavor = base_flavor&.to_sym
         @gem = gem || "metanorma-#{name}"
@@ -36,6 +50,19 @@ module Metanorma
         @publisher_abbr = publisher_abbr
         @doctype_map = doctype_map
         @semantic_input = semantic_input
+        @labeler = self.class.labeler_choice(labeler)
+        unless labelers.is_a?(Hash)
+          raise ArgumentError, "Labelers must be a name-to-callable mapping"
+        end
+
+        @labelers = labelers.each_with_object({}) do |(kind, adapter), result|
+          key = self.class.labeler_choice(kind)
+          unless key && adapter.respond_to?(:call)
+            raise ArgumentError, "Labeler #{kind.inspect} must respond to call"
+          end
+
+          result[key] = adapter
+        end
       end
 
       def taste? = !!base_flavor

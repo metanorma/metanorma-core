@@ -51,6 +51,52 @@ module Metanorma
         entry = find_by_name(entry.base_flavor) while entry&.base_flavor
         entry
       end
+
+      # Effective labeler for a flavor or taste: an explicit override, else the
+      # nearest registration along the taste -> base chain. Legacy xref is the
+      # default until a flavor opts in to ladl.
+      def labeler_name(name, override: nil)
+        explicit = Flavor.labeler_choice(override)
+        return explicit if explicit
+
+        flavor_chain(name).each do |entry|
+          return entry.labeler if entry.labeler
+        end
+        :xref
+      end
+
+      # Adapter (callable taking the presentation model) for the effective
+      # labeler. Nil for xref, which stays owned by the legacy converter; an
+      # unregistered ladl adapter fails loudly rather than falling back.
+      def labeler_for(name, labeler: nil)
+        selected = labeler_name(name, override: labeler)
+        flavor_chain(name).each do |entry|
+          adapter = entry.labelers[selected]
+          return adapter if adapter
+        end
+        return nil if selected == :xref
+
+        raise ArgumentError,
+              "No #{selected} labeler adapter registered for #{name}"
+      end
+
+      private
+
+      def flavor_chain(name)
+        chain = []
+        entry = find_by_name(name)
+        while entry
+          circular!(chain + [entry]) if chain.include?(entry)
+          chain << entry
+          entry = entry.base_flavor && find_by_name(entry.base_flavor)
+        end
+        chain
+      end
+
+      def circular!(chain)
+        names = chain.map(&:name).join(" -> ")
+        raise ArgumentError, "Circular flavor inheritance: #{names}"
+      end
     end
   end
 end
