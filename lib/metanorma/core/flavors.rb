@@ -41,6 +41,10 @@ module Metanorma
           table.find_by_name(name)
         end
 
+        def engine_for(type, kind:, override: nil)
+          table.engine_for(type, kind: kind, override: override)
+        end
+
         # Tastes of a given base flavor (for dictionaries/projections).
         def tastes_of(base)
           table.select { |f| f.taste? && f.base_flavor == base.to_sym }

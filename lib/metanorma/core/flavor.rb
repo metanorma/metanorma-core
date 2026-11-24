@@ -17,14 +17,32 @@ module Metanorma
     # selection (publisher/profile/doctype). Returning nil falls through
     # to the next matching entry.
     class Flavor
+      ENGINE_OPTIONS = {
+        html_engine: %i[isodoc document].freeze,
+      }.freeze
+
       attr_reader :name, :base_flavor, :gem, :model_root, :processor,
                   :renderers, :pubid_module, :branding_dir,
-                  :publisher_abbr, :doctype_map, :semantic_input
+                  :publisher_abbr, :doctype_map, :semantic_input,
+                  :html_engine
+
+      def self.engine_choice(kind, value)
+        choices = ENGINE_OPTIONS.fetch(kind) do
+          raise ArgumentError, "Unknown engine kind #{kind.inspect}"
+        end
+        return nil if value.nil?
+
+        choice = value.to_sym if value.is_a?(String) || value.is_a?(Symbol)
+        return choice if choices.include?(choice)
+
+        raise ArgumentError,
+              "Unknown #{kind} #{value.inspect}; expected #{choices.join(' or ')}"
+      end
 
       def initialize(name:, base_flavor: nil, gem: nil, model_root: nil,
                      processor: nil, renderers: {}, pubid_module: nil,
                      branding_dir: nil, publisher_abbr: nil, doctype_map: {},
-                     semantic_input: false)
+                     semantic_input: false, html_engine: nil)
         @name = name&.to_sym
         @base_flavor = base_flavor&.to_sym
         @gem = gem || "metanorma-#{name}"
@@ -36,6 +54,7 @@ module Metanorma
         @publisher_abbr = publisher_abbr
         @doctype_map = doctype_map
         @semantic_input = semantic_input
+        @html_engine = self.class.engine_choice(:html_engine, html_engine)
       end
 
       def taste? = !!base_flavor
