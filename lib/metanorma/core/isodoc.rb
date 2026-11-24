@@ -59,6 +59,11 @@ module Metanorma
       # @return [Object] the same +converter+, fully initialised.
       def self.init(converter, lang:, script:, locale: nil,
                     i18nyaml: nil, xml: nil, localdir: nil)
+        if defined?(DocumentHtmlConverter) && converter.is_a?(DocumentHtmlConverter)
+          return converter.configure(lang: lang, script: script, locale: locale,
+                                     i18nyaml: i18nyaml, localdir: localdir)
+        end
+
         converter.init_i18n(i18nyaml: i18nyaml, language: lang,
                             script: script, locale: locale)
         i18n = converter.i18n_init(lang, script, locale, i18nyaml)
@@ -81,13 +86,21 @@ module Metanorma
       #   +:standoc+) or a taste name resolvable to one.
       # @param presxml [Boolean] If true (default), return the flavor's
       #   presentation-XML converter; otherwise its HTML converter.
-      # @return [Object] An IsoDoc-style converter instance, ready to
-      #   pass to {.init}.
+      # @param html_engine [Symbol, String, nil] Per-call HTML engine override;
+      #   nil inherits the flavor/taste registration (legacy by default).
+      # @return [Object] A legacy or document-model converter, ready to pass
+      #   to {.init}. Both accept the established +convert+ signature.
       # @raise [RuntimeError] If no Asciidoctor converter is registered
       #   for the resolved flavor, or if the converter does not support
       #   the requested output stage.
-      def self.resolve_converter(flavor, presxml: true)
+      def self.resolve_converter(flavor, presxml: true, html_engine: nil)
         resolved = Metanorma::Core::FlavorLoader.load_flavor(flavor)
+        engine = Flavors.engine_for(flavor, kind: :html_engine,
+                                           override: html_engine)
+        if !presxml && engine == :document
+          require_relative "document_html_converter"
+          return DocumentHtmlConverter.new(flavor)
+        end
         conv_class = ::Asciidoctor::Converter.for(resolved.to_s) ||
           ::Asciidoctor::Converter.for(resolved)
         conv_class or
@@ -121,8 +134,11 @@ module Metanorma
       # @return [Object] a fully initialised IsoDoc-style converter.
       # @see https://github.com/metanorma/metanorma/issues/558
       def self.create(flavor, lang:, script:, locale: nil, i18nyaml: nil,
-                      xml: nil, localdir: nil, presxml: true)
-        conv = resolve_converter(flavor, presxml: presxml)
+                      xml: nil, localdir: nil, presxml: true,
+                      html_engine: nil)
+        selection = {}
+        selection[:html_engine] = html_engine unless html_engine.nil?
+        conv = resolve_converter(flavor, presxml: presxml, **selection)
         init(conv, lang: lang, script: script, locale: locale,
                    i18nyaml: i18nyaml, xml: xml, localdir: localdir)
       end
