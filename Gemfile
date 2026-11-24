@@ -12,3 +12,6 @@ gem "gem-release"
 gem "rake"
 
 eval_gemfile("Gemfile.devel") rescue nil
+
+# Temporary: needs metanorma-standoc#1402; drop after the next standoc release.
+gem "metanorma-standoc", github: "metanorma/metanorma-standoc", ref: "d35b42e882eeea84696592b5fc9d448ab82b88ac"
