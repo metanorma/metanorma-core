@@ -47,13 +47,46 @@ module Metanorma
         entry.is_a?(Proc) ? entry.call(document, **options) : entry
       end
 
-      def matches?(document_class)
+      def matches?(document_class, document = nil)
         return false unless document_class.is_a?(Class)
 
         root = model_root_class
         return false unless root
+        return false unless document_class <= root
+        return true unless taste? && publisher_abbr
 
-        !!(document_class <= root)
+        publisher_matches?(document)
+      end
+
+      # A taste stacked over its base shares the base's model root, so
+      # the class check alone cannot discriminate: several tastes
+      # (wmo, iala, icc over iho/standoc roots) match the same document
+      # class. The taste's publisher abbreviation against the document
+      # bibdata is the discriminator. Same reading as metanorma-taste's
+      # renderer gate: first author contributor carrying a non-empty
+      # organization abbreviation. A document without bibdata (probe
+      # fixtures, internal probes) matches on the class check alone.
+      def publisher_matches?(document)
+        return true unless document.respond_to?(:bibdata)
+
+        contributors = document.bibdata&.contributor
+        return true unless contributors
+
+        contributors.each do |c|
+          roles = c.respond_to?(:role) ? Array(c.role) : []
+          author = roles.any? do |r|
+            (r.respond_to?(:type) ? r.type : r.to_s) == "author"
+          end
+          next unless author
+
+          org = c.respond_to?(:organization) ? c.organization : nil
+          next unless org
+
+          abbrev = org.respond_to?(:abbreviation) ? org.abbreviation : nil
+          abbrev = abbrev.to_s unless abbrev.is_a?(String)
+          return abbrev == publisher_abbr unless abbrev.empty?
+        end
+        true
       end
 
       def model_root_class
