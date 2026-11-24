@@ -65,7 +65,9 @@ module Metanorma
       # bibdata is the discriminator. Same reading as metanorma-taste's
       # renderer gate: first author contributor carrying a non-empty
       # organization abbreviation. A document without bibdata (probe
-      # fixtures, internal probes) matches on the class check alone.
+      # fixtures, internal probes) matches on the class check alone;
+      # a bibdata that names no author abbreviation cannot claim the
+      # taste either — the base flavor serves such documents.
       def publisher_matches?(document)
         return true unless document.respond_to?(:bibdata)
 
@@ -86,7 +88,7 @@ module Metanorma
           abbrev = abbrev.to_s unless abbrev.is_a?(String)
           return abbrev == publisher_abbr unless abbrev.empty?
         end
-        true
+        false
       end
 
       def model_root_class
