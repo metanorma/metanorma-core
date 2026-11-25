@@ -2,10 +2,11 @@
 
 module Metanorma
   module Core
-    # The process-wide flavor/taste table. Registered most-specific-last;
-    # resolution walks most-specific-first so flavor gems (loaded after
-    # the harness defaults) win, and taste entries fall through to their
-    # base chain by yielding nil.
+    # The process-wide flavor/taste table. Resolution walks
+    # most-specific-first (tastes before their base flavors) so flavor
+    # gems win over the harness defaults and taste entries fall through
+    # to their base chain by yielding nil, independent of the order in
+    # which the gems happened to load.
     class FlavorRegistry
       include Enumerable
 
@@ -25,19 +26,21 @@ module Metanorma
       end
 
       def flavor_for(document)
-        @flavors.reverse_each.find { |f| f.matches?(document.class) }
+        most_specific_first.find { |f| f.matches?(document.class, document) }
       end
 
       # Renderer class for (document, format): walk matching entries
       # most-specific-first; a taste without its own renderer for the
       # format yields nil and falls through to the base flavor entry.
       def renderer_for(format, document, flavor: nil, **options)
-        entries = flavor ? flavor_chain(flavor) : @flavors.reverse_each
-        return nil if flavor && !entries.any? { |entry| entry.matches?(document.class) }
+        entries = flavor ? flavor_chain(flavor) : most_specific_first
+        if flavor && !entries.any? { |entry| entry.matches?(document.class, document) }
+          return nil
+        end
 
         entries.each do |entry|
           inherits_model = flavor && entry.taste? && entry.model_root.nil?
-          next unless inherits_model || entry.matches?(document.class)
+          next unless inherits_model || entry.matches?(document.class, document)
 
           renderer = entry.renderer_for(format, document, **options)
           return renderer if renderer
@@ -91,6 +94,15 @@ module Metanorma
           entry = entry.base_flavor && find_by_name(entry.base_flavor)
         end
         chain
+      end
+
+      # Tastes before base flavors regardless of registration order:
+      # flavor gems self-register on their own load time, so a taste
+      # registered first (metanorma-taste loading before the base gem)
+      # would otherwise lose the reverse-order walk to its own base.
+      def most_specific_first
+        tastes, bases = @flavors.partition(&:taste?)
+        tastes.reverse_each + bases.reverse_each
       end
     end
   end
