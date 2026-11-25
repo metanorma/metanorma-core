@@ -13,3 +13,26 @@ This is a core repository for plugin dependencies of Metanorma, allowing metanor
 
 
 <!-- canary: automerge stub verification, revert not needed -->
+
+== HTML converter engine
+
+Flavors can opt into the document model's HTML renderer while unconfigured
+flavors keep the IsoDoc HTML converter:
+
+[source,ruby]
+----
+Metanorma::Core::Flavors.register(Metanorma::Core::Flavor.new(
+  name: :example, model_root: Example::Document::Root,
+  renderers: { html: Example::Html::Renderer }, html_engine: :document))
+----
+
+Tastes inherit the engine and model through their base-flavor chain. An
+explicit taste choice or per-call `html_engine: :isodoc` overrides that choice.
+The converter factory accepts `html_engine: :document` for HTML requests
+(`presxml: false`); presentation-XML conversion keeps its existing path.
+
+The document converter accepts the established
+`convert(input_filename, xml = nil, debug = false, output_filename = nil)`
+signature. It reads presentation XML through the registered model and invokes
+the registered renderer. Presentation labels must already be in the model.
+Missing models/renderers and invalid engine choices raise explicit errors.

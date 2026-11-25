@@ -19,13 +19,13 @@ RSpec.describe Metanorma::Core::Flavors, :aggregate_failures do
 
   it "defaults to xref with no adapter" do
     register(name: :rspec_lbl_a)
-    expect(flavors.labeler_name(:rspec_lbl_a)).to eq(:xref)
+    expect(flavors.engine_for(:rspec_lbl_a, kind: :labeler)).to eq(:xref)
     expect(flavors.labeler_for(:rspec_lbl_a)).to be_nil
   end
 
   it "dispatches to the registered ladl adapter when the flavor opts in" do
     register(name: :rspec_lbl_a, labeler: :ladl, labelers: { ladl: ladl })
-    expect(flavors.labeler_name(:rspec_lbl_a)).to eq(:ladl)
+    expect(flavors.engine_for(:rspec_lbl_a, kind: :labeler)).to eq(:ladl)
     expect(flavors.labeler_for(:rspec_lbl_a)).to equal(ladl)
   end
 
@@ -39,7 +39,7 @@ RSpec.describe Metanorma::Core::Flavors, :aggregate_failures do
   it "lets a taste inherit its base flavor's labeler and adapter" do
     register(name: :rspec_lbl_a, labeler: :ladl, labelers: { ladl: ladl })
     register(name: :rspec_lbl_t, base_flavor: :rspec_lbl_a)
-    expect(flavors.labeler_name(:rspec_lbl_t)).to eq(:ladl)
+    expect(flavors.engine_for(:rspec_lbl_t, kind: :labeler)).to eq(:ladl)
     expect(flavors.labeler_for(:rspec_lbl_t)).to equal(ladl)
   end
 
@@ -71,7 +71,7 @@ RSpec.describe Metanorma::Core::Flavors, :aggregate_failures do
   it "detects circular inheritance" do
     register(name: :rspec_lbl_a, base_flavor: :rspec_lbl_b)
     register(name: :rspec_lbl_b, base_flavor: :rspec_lbl_a)
-    expect { flavors.labeler_name(:rspec_lbl_a) }
+    expect { flavors.engine_for(:rspec_lbl_a, kind: :labeler) }
       .to raise_error(ArgumentError, /Circular/)
   end
 end

@@ -41,8 +41,8 @@ module Metanorma
           table.find_by_name(name)
         end
 
-        def labeler_name(type, override: nil)
-          table.labeler_name(type, override: override)
+        def engine_for(type, kind:, override: nil)
+          table.engine_for(type, kind: kind, override: override)
         end
 
         def labeler_for(type, labeler: nil)
