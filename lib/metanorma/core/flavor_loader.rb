@@ -28,7 +28,7 @@ module Metanorma
       def taste2flavor(stdtype)
         stdtype = stdtype.to_sym
         entry = Flavors.find(stdtype)
-        return entry.base_flavor if entry&.taste?
+        return Flavors.table.canonical_name(stdtype) if entry&.taste?
 
         # Transitional: taste entries land in the table with
         # metanorma-taste's restructure PR; until then fall back to
