@@ -51,7 +51,7 @@ module Metanorma
       #   region-specific overrides.
       # @param i18nyaml [Hash, String, nil] Either a parsed i18n hash or
       #   a path to a YAML file. Forwarded to +init_i18n+.
-      # @param xml [Nokogiri::XML::Node, nil] If supplied, +converter.info+
+      # @param xml [Moxml::Node, nil] If supplied, +converter.info+
       #   is invoked against it so document-level metadata can be primed.
       # @param localdir [String, nil] If supplied, wired into both
       #   +converter.meta+ and +converter.xrefs.klass+ so file lookups
@@ -112,7 +112,7 @@ module Metanorma
       # @param locale [String, nil] optional BCP-47 locale tag.
       # @param i18nyaml [Hash, String, nil] either a parsed i18n hash or
       #   a path to a YAML file. Forwarded to +init_i18n+.
-      # @param xml [Nokogiri::XML::Node, nil] if supplied, +converter.info+
+      # @param xml [Moxml::Node, nil] if supplied, +converter.info+
       #   is invoked against it for metadata priming.
       # @param localdir [String, nil] wired into +converter.meta+ and
       #   +converter.xrefs.klass+ for relative file-lookup resolution.
