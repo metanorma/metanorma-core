@@ -1,5 +1,3 @@
-require "nokogiri"
-
 module Metanorma
   module Input
     # Asciidoc input processor. Wraps Asciidoctor to convert raw
