@@ -32,11 +32,17 @@ module Metanorma
       # Renderer class for (document, format): walk matching entries
       # most-specific-first; a taste without its own renderer for the
       # format yields nil and falls through to the base flavor entry.
-      def renderer_for(format, document, **options)
-        most_specific_first.each do |flavor|
-          next unless flavor.matches?(document.class, document)
+      def renderer_for(format, document, flavor: nil, **options)
+        entries = flavor ? flavor_chain(flavor) : most_specific_first
+        if flavor && !entries.any? { |entry| entry.matches?(document.class, document) }
+          return nil
+        end
 
-          renderer = flavor.renderer_for(format, document, **options)
+        entries.each do |entry|
+          inherits_model = flavor && entry.taste? && entry.model_root.nil?
+          next unless inherits_model || entry.matches?(document.class, document)
+
+          renderer = entry.renderer_for(format, document, **options)
           return renderer if renderer
         end
         nil
@@ -46,14 +52,59 @@ module Metanorma
       # base_flavor chain so compile loads the base flavor's gem and
       # processor while the taste supplies config.
       def canonical(name)
-        entry = find_by_name(name)
-        return nil unless entry
+        chain = flavor_chain(name)
+        entry = chain.last
+        entry unless entry&.taste?
+      end
 
-        entry = find_by_name(entry.base_flavor) while entry&.base_flavor
-        entry
+      # Unlike #canonical this also works before the base gem registers its
+      # model/processor entry, allowing FlavorLoader to require that gem.
+      def canonical_name(name)
+        entry = flavor_chain(name).last
+        entry ? (entry.base_flavor || entry.name) : name.to_sym
+      end
+
+      # First model_root_class on the flavor's chain (taste first, then
+      # its bases); nil when none resolves.
+      def model_root_class_for(name)
+        flavor_chain(name).each do |entry|
+          klass = entry.model_root_class
+          return klass if klass
+        end
+        nil
+      end
+
+      # Nil means inherit. Only the effective registry lookup supplies legacy
+      # defaults, so an unconfigured taste does not mask its base's choice.
+      def engine_for(name, kind:, override: nil)
+        explicit = Flavor.engine_choice(kind, override)
+        chain = flavor_chain(name)
+        return explicit if explicit
+
+        chain.each do |entry|
+          value = entry.public_send(kind)
+          return value if value
+        end
+        { html_engine: :isodoc }.fetch(kind)
       end
 
       private
+
+      def flavor_chain(name)
+        chain = []
+        seen = []
+        entry = find_by_name(name)
+        while entry
+          if seen.include?(entry.name)
+            raise ArgumentError,
+                  "Circular flavor inheritance: #{(seen + [entry.name]).join(' -> ')}"
+          end
+          seen << entry.name
+          chain << entry
+          entry = entry.base_flavor && find_by_name(entry.base_flavor)
+        end
+        chain
+      end
 
       # Tastes before base flavors regardless of registration order:
       # flavor gems self-register on their own load time, so a taste

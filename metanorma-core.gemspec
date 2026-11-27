@@ -36,6 +36,9 @@ Gem::Specification.new do |spec|
   spec.add_dependency "singleton"
 
   spec.add_development_dependency "debug"
+  # Exercise the document HTML adapter against native models and renderers.
+  spec.add_development_dependency "metanorma-document", "~> 0.5.11"
+  spec.add_development_dependency "metanorma-standoc", "~> 3.5.26"
   spec.add_development_dependency "rake", "~> 13.0"
   spec.add_development_dependency "rspec", "~> 3.6"
   spec.add_development_dependency "rubocop", "~> 1"
