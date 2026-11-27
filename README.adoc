@@ -31,6 +31,12 @@ explicit taste choice or per-call `html_engine: :isodoc` overrides that choice.
 The converter factory accepts `html_engine: :document` for HTML requests
 (`presxml: false`); presentation-XML conversion keeps its existing path.
 
+The `html_engine` choice applies to callers of the `Core::Isodoc` factory
+only. Compile HTML output does not use it in 1.19. Collection rendering needs
+the legacy converter's methods (`populate_template`, `info`, `meta`,
+`xref_init` and the rest); on the document converter these raise
+`NotImplementedError` naming the engine.
+
 The document converter accepts the established
 `convert(input_filename, xml = nil, debug = false, output_filename = nil)`
 signature. It reads presentation XML through the registered model and invokes
