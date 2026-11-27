@@ -64,6 +64,16 @@ module Metanorma
         entry ? (entry.base_flavor || entry.name) : name.to_sym
       end
 
+      # First model_root_class on the flavor's chain (taste first, then
+      # its bases); nil when none resolves.
+      def model_root_class_for(name)
+        flavor_chain(name).each do |entry|
+          klass = entry.model_root_class
+          return klass if klass
+        end
+        nil
+      end
+
       # Nil means inherit. Only the effective registry lookup supplies legacy
       # defaults, so an unconfigured taste does not mask its base's choice.
       def engine_for(name, kind:, override: nil)

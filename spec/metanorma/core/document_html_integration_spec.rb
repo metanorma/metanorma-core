@@ -76,4 +76,47 @@ RSpec.describe "document HTML dispatch with native presentation models" do
     expect(Metanorma::Core::Isodoc.resolve_converter(:standoc, presxml: false))
       .not_to be_a(Metanorma::Core::DocumentHtmlConverter)
   end
+
+  describe "review fixes" do
+    around do |ex|
+      saved = Metanorma::Core::Flavors.table
+      reg = Metanorma::Core::FlavorRegistry.new
+      reg.register(Metanorma::Core::Flavors.find(:standoc))
+      Metanorma::Core::Flavors.instance_variable_set(:@table, reg)
+      ex.run
+    ensure
+      Metanorma::Core::Flavors.instance_variable_set(:@table, saved)
+    end
+
+    it "passes only renderer-scoped options to a strict resolver" do
+      Metanorma::Core::Flavors.register(Metanorma::Core::Flavor.new(
+        name: :strict, base_flavor: :standoc, html_engine: :document,
+        renderers: { html: ->(_d, theme: nil) { Metanorma::Html::StandardRenderer } }
+      ))
+      html = converter(:strict).convert("u.presentation.xml", xml, true)
+      expect(html).to include("Document engine integration sentinel")
+    end
+
+    it "parses with the taste's own model_root" do
+      root = Class.new(Metanorma::Standoc::Document::Root)
+      renderer = Class.new do
+        define_method(:generate_full_document) { |d, **| d.class.name.to_s + d.class.superclass.name }
+      end
+      Metanorma::Core::Flavors.register(Metanorma::Core::Flavor.new(
+        name: :own, base_flavor: :standoc, html_engine: :document,
+        model_root: root, renderers: { html: renderer }
+      ))
+      out = converter(:own).convert("u.xml", xml, true)
+      expect(out).to include("Metanorma::Standoc::Document::Root")
+      expect(Metanorma::Core::Flavors.model_root_class_for(:own)).to eq(root)
+    end
+
+    it "raises NotImplementedError naming the engine for collection methods" do
+      conv = converter
+      %i[populate_template docid_prefix info meta xref_init].each do |m|
+        expect { conv.public_send(m) }
+          .to raise_error(NotImplementedError, /document HTML engine/)
+      end
+    end
+  end
 end
